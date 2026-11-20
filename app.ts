@@ -845,9 +845,12 @@ function pullObject(repo: Repo, pull: PullRequest): Record<string, unknown> {
 function pullMergeable(repo: Repo, pull: PullRequest): 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN' {
   if (pull.state !== 'open') return 'UNKNOWN';
   const headCommit = repo.objects.get(pull.headSha);
-  const baseCommit = repo.objects.get(pull.baseSha);
+  // The base side is the CURRENT base branch tip, not the tip at PR creation: another
+  // pull request may have merged onto the base since this one was opened.
+  const baseTipSha = repo.refs.get(`refs/heads/${pull.baseRef}`) ?? pull.baseSha;
+  const baseCommit = repo.objects.get(baseTipSha);
   if (headCommit === undefined || baseCommit === undefined) return 'UNKNOWN';
-  const base = repo.mergeBase(pull.headSha, pull.baseSha);
+  const base = repo.mergeBase(pull.headSha, baseTipSha);
   if (base === undefined) return 'UNKNOWN';
   const baseTree = parseCommit(repo.objects.get(base)!.data).tree;
   const headTree = parseCommit(headCommit.data).tree;
